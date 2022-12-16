@@ -126,24 +126,7 @@ g %>%
   )
 
 
-
-
 # nuevo ejemplo -----------------------------------------------------------
-
-df_temp <- data.frame(
-  id = c(1, 1, 1, 2, 2, 2, 3, 3, 3),
-  anio = rep(c(2019, 2020, 2021), 3),
-  segmento = c('A', 'A', 'B', 'B', 'B', 'C', 'C', 'B', 'C')
-)
-df_temp
-
-
-
-mc <- markovchainFit(data = split(df_temp$segmento, df_temp$id),
-                     method = 'mle' #  'bootstrap', 'laplacian'
-)
-mc$estimate
-
 
 split(df_markov %>% head(6) %>% pull(segmento),
       df_markov %>% head(6) %>% pull(id))
