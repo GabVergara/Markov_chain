@@ -7,7 +7,7 @@ library(readr)
 library(readxl)
 library(dplyr)
 
-# Datos raw ---------------------------------------------------------------
+# Datos raw meee ---------------------------------------------------------------
 df <- read.csv('Markov.csv', sep = ";")
 
 
@@ -19,9 +19,9 @@ df %>% pull(download) %>% table()
 set.seed(42)
 ids <- df %>% 
   filter(download ==20220801) %>% 
-  summarise(Rut12=unique(Rut12)) %>% 
+  summarise(id=unique(Rut12)) %>% 
   sample_n(10000) %>%
-  pull(Rut12)
+  pull(id)
 
 
 # se definen segmentos ---------------------------------------------------
