@@ -8,109 +8,70 @@ library(readxl)
 library(dplyr)
 
 # Datos raw ---------------------------------------------------------------
-df <- read_csv('https://cdn.produccion.gob.ar/cdn-cep/araucano/base_araucano.csv')
-
-# Diccionario de parametrías:
-path <- "diccionario.xlsx"
-sheetnames <- excel_sheets(path)
-
-for(i in 1:length(sheetnames)) {
-  assign(sheetnames[i],read_excel(path,sheet = i))
-}
-
-cod_letra <- cod_letra %>% 
-  janitor::clean_names()
-
-# Datos limpios -----------------------------------------------------------
-df_clean <- df %>% 
-  left_join(cod_rama) %>% 
-  left_join(cod_genero) %>% 
-  left_join(cod_disciplina) %>% 
-  left_join(cod_gestion) %>% 
-  left_join(cod_letra) %>% 
-  left_join(cod_region) %>% 
-  left_join(cod_tamaño) %>% 
-  left_join(cod_titulo) %>% 
-  select(id, anio, anioegreso, salario, genero, anionac, 
-         rama, disciplina, tipo_titulo,
-         region, tamaño, actividad = letra_1) %>% 
-  arrange(id, anio)
-
-# Save --------------------------------------------------------------------
-df_clean %>% write.csv('df_clean.csv', row.names=FALSE)
-df <- read_csv('df_clean.csv')
+df <- read.csv('Markov.csv', sep = ";")
 
 
-mee
 skim(df %>% sample_n(10000))
 
 
-df %>% pull(anio) %>% table()
+df %>% pull(download) %>% table()
 
 set.seed(42)
 ids <- df %>% 
-  filter(anioegreso==2018) %>% 
-  summarise(id=unique(id)) %>% 
+  filter(download ==20220801) %>% 
+  summarise(Rut12=unique(Rut12)) %>% 
   sample_n(10000) %>%
-  pull(id)
+  pull(Rut12)
 
 
 # se definen segmentos ---------------------------------------------------
 
 
 df_markov <- df %>%
-  filter(id %in% ids) %>%
-  group_by(anio) %>%
-  mutate(
-    segmento_bin = cut_number(salario, n = 3, dig.lab = 7),
-    segmento = cut_number(
-      salario,
-      n = 3,
-      labels = c('salario_bajo',
-                 'salario_medio',
-                 'salario_alto')
-    )
-  ) %>%
-  mutate(segmento = factor(
-    forcats::fct_explicit_na(segmento, 'sin_empleo_registrado'),
-    levels = c(
-      'sin_empleo_registrado',
-      'salario_bajo',
-      'salario_medio',
-      'salario_alto'
-    )
-  )) %>%
+  filter(Rut12 %in% ids) %>%
+  group_by(download) %>%
   ungroup() %>%
-  select(id, anio, salario, segmento, segmento_bin)
-
+  select(Rut12, Periodo, esc_nombre, download)
 
 
 df_markov %>% 
-  group_by(anio, segmento) %>% 
+  group_by(download, esc_nombre) %>% 
   summarise(N=n()) %>%
   #ungroup() %>% 
-  pivot_wider(names_from=anio, values_from=N) %>% 
+  pivot_wider(names_from=download, values_from=N) %>% 
   gt() %>% 
   tab_header(title='Cantidad de individuos por segmento en cada año') %>% 
   opt_align_table_header('left')
 
 
 
+df_markov %>% 
+  filter(Periodo == 202208) %>%
+  select(-Periodo) %>%
+  group_by(download, esc_nombre) %>% 
+  summarise(N=n()) %>%
+  #ungroup() %>% 
+  pivot_wider(names_from=download, values_from=N) %>% 
+  gt() %>% 
+  tab_header(title='Cantidad de individuos por segmento en cada año') %>% 
+  opt_align_table_header('left')
+unique(df_markov$esc_nombre)
+
 g <- df_markov %>%
-  select(-salario, -segmento_bin) %>% 
-  filter(anio !=2020) %>% 
-  tidyr::pivot_wider(names_from = anio, values_from = segmento) %>% 
-  group_by(`2019`, `2021`) %>%
+  filter(Periodo == 202208) %>%
+  select(-Periodo) %>% 
+  tidyr::pivot_wider(names_from = download, values_from = esc_nombre) %>% 
+  group_by(`20220801`, `20220830`) %>%
   summarise(freq = n(), .groups = "drop") %>%
-  group_by(`2019`) %>%
+  group_by(`20220801`) %>%
   mutate(
     freq = round(proportions(freq), 3), 
-    color = case_when(`2019` == 'sin_empleo_registrado' ~ 'red',
-                      TRUE ~ 'lightgrey')
+    color = case_when(`20220801` == 'Castigo' ~ 'red',
+                      TRUE ~ 'Black')
   ) %>% 
   graph_from_data_frame(directed=TRUE)
 
-V(g)$color <- ifelse(V(g)$name == 'sin_empleo_registrado', "red", "lightgrey")
+V(g)$color <- ifelse(V(g)$name == 'Castigo', "red", "lightgrey")
 
 
 g %>%
@@ -121,27 +82,32 @@ g %>%
     vertex.size = 20,
     vertex.label = V(.)$names,
     vertex.color = V(.)$color,
-    vertex.label.dist = 4,
+    vertex.label.dist = 5,
     vertex.label.font = 2
   )
 
 
 # nuevo ejemplo -----------------------------------------------------------
 
-split(df_markov %>% head(6) %>% pull(segmento),
-      df_markov %>% head(6) %>% pull(id))
+df_markov2 <- df_markov %>%
+  filter(Periodo == 202208) %>%
+  select(-Periodo)
 
 
-mc <- markovchainFit(data = split(df_markov$segmento, df_markov$id),
+split(df_markov2 %>% head(6) %>% pull(esc_nombre),
+      df_markov2 %>% head(6) %>% pull(Rut12))
+
+
+mc <- markovchainFit(data = split(df_markov2$esc_nombre, df_markov2$Rut12),
                      method = 'mle' #  'bootstrap', 'laplacian'
 )
 
 
 data.frame(mc$estimate@transitionMatrix) %>%
-  select(all_of(levels(df_markov$segmento))) %>%
+  select(all_of(levels(df_markov2$esc_nombre))) %>%
   rownames_to_column('estado_inicial') %>%
   mutate(estado_inicial = factor(estado_inicial,
-                                 levels = levels(df_markov$segmento))) %>%
+                                 levels = levels(df_markov2$esc_nombre))) %>%
   arrange(estado_inicial) %>%
   gt(rowname_col = 'estado_inicial') %>%
   fmt_number(2:5) %>%
