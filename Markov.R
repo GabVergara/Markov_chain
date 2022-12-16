@@ -41,7 +41,7 @@ df_clean %>% write.csv('df_clean.csv', row.names=FALSE)
 df <- read_csv('df_clean.csv')
 
 
-
+mee
 skim(df %>% sample_n(10000))
 
 
